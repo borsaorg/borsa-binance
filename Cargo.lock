@@ -130,6 +130,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 [[package]]
 name = "binance"
 version = "0.21.2"
+source = "git+https://github.com/butterfly-trading/binance-rs-fork?rev=c3204e17115d47ca85445123c6b1d02561f61586#c3204e17115d47ca85445123c6b1d02561f61586"
 dependencies = [
  "clap",
  "futures-util",
@@ -197,6 +198,7 @@ dependencies = [
 [[package]]
 name = "borsa-core"
 version = "0.3.0"
+source = "git+https://github.com/borsaorg/borsa?rev=4401d9b22ca439bba7760c0d7e20bc4e8b634182#4401d9b22ca439bba7760c0d7e20bc4e8b634182"
 dependencies = [
  "async-trait",
  "bitflags",
@@ -214,6 +216,7 @@ dependencies = [
 [[package]]
 name = "borsa-macros"
 version = "0.3.0"
+source = "git+https://github.com/borsaorg/borsa?rev=4401d9b22ca439bba7760c0d7e20bc4e8b634182#4401d9b22ca439bba7760c0d7e20bc4e8b634182"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -224,6 +227,7 @@ dependencies = [
 [[package]]
 name = "borsa-middleware"
 version = "0.3.0"
+source = "git+https://github.com/borsaorg/borsa?rev=4401d9b22ca439bba7760c0d7e20bc4e8b634182#4401d9b22ca439bba7760c0d7e20bc4e8b634182"
 dependencies = [
  "async-trait",
  "borsa-core",
@@ -237,6 +241,7 @@ dependencies = [
 [[package]]
 name = "borsa-types"
 version = "0.3.0"
+source = "git+https://github.com/borsaorg/borsa?rev=4401d9b22ca439bba7760c0d7e20bc4e8b634182#4401d9b22ca439bba7760c0d7e20bc4e8b634182"
 dependencies = [
  "paft",
  "serde",

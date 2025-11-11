@@ -1,0 +1,5 @@
+target/
+.env.test
+
+# Stitch workspace (per-user)
+.stitchworkspace/local/

@@ -1,0 +1,34 @@
+[package]
+name = "borsa-binance"
+version = "0.3.0"
+edition = "2024"
+license = "MIT"
+authors = ["Giovanni Ramistella <contact@borsa.rs>"]
+description = "Binance API connector for the borsa ecosystem."
+readme = "README.md"
+repository = "https://github.com/borsaorg/borsa-binance"
+homepage = "https://github.com/borsaorg/borsa-binance"
+documentation = "https://docs.rs/borsa-binance"
+keywords = ["finance", "binance", "crypto", "market-data"]
+categories = ["api-bindings", "finance", "web-programming::http-client"]
+
+[features]
+default = []
+test-adapters = []
+tracing = []
+
+[dependencies]
+borsa-core = { path = "../borsa-workspace/borsa-core" }
+borsa-middleware = { path = "../borsa-workspace/borsa-middleware" }
+async-trait = "0.1.89"
+thiserror = "2.0.17"
+tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread", "signal"] }
+serde = { version = "1.0.228", features = ["derive"] }
+chrono = "0.4.42"
+binance = { path = "../../binance-rs-fork"}
+serde_json = "1.0.145"
+futures-util = "0.3.30"
+rust_decimal = "1.39.0"
+tokio-tungstenite = "0.28.0"
+
+[dev-dependencies]

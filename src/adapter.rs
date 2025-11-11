@@ -133,12 +133,8 @@ impl BinanceApi for RealAdapter {
 
         let topics_clone = topics.clone();
         let join = tokio::spawn(async move {
-            println!("[binance-options] connecting {}", url);
             let (mut stream, _resp) = match connect_async(&url).await {
-                Ok(ans) => {
-                    println!("[binance-options] connected {}", url);
-                    ans
-                }
+                Ok(ans) => ans,
                 Err(e) => {
                     eprintln!("[binance-options] connect error {}: {}", url, e);
                     return;
@@ -160,7 +156,6 @@ impl BinanceApi for RealAdapter {
                 let _ = stream.close(None).await;
                 return;
             }
-            println!("[binance-options] subscribed {:?}", topics);
 
             // Ping task
             let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(15));
@@ -176,7 +171,6 @@ impl BinanceApi for RealAdapter {
                         });
                         let _ = stream.send(Message::Text(unsub_req.to_string().into())).await;
                         let _ = stream.close(None).await;
-                        println!("[binance-options] stop received {}", url);
                         break;
                     }
                     _ = ping_interval.tick() => {
@@ -185,8 +179,6 @@ impl BinanceApi for RealAdapter {
                     msg = stream.next() => {
                         match msg {
                             Some(Ok(Message::Text(txt))) => {
-                                // Debug: raw payload length
-                                // println!("[binance-options] msg len={}", txt.len());
                                 let mut v: serde_json::Value = match serde_json::from_str(&txt) {
                                     Ok(v) => v,
                                     Err(_) => continue,
@@ -209,7 +201,7 @@ impl BinanceApi for RealAdapter {
                                 }
                             }
                             Some(Ok(Message::Ping(p))) => { let _ = stream.send(Message::Pong(p)).await; }
-                            Some(Ok(Message::Close(_))) => { println!("[binance-options] close received {}", url); break; }
+                            Some(Ok(Message::Close(_))) => { break; }
                             Some(Ok(_)) => {}
                             Some(Err(e)) => { eprintln!("[binance-options] stream err: {}", e); break; }
                             None => { eprintln!("[binance-options] stream ended {}", url); break; }
@@ -256,18 +248,16 @@ impl BinanceApi for RealAdapter {
             connect_futures.push(init_rx);
 
             task_handles.push(tokio::spawn(async move {
-                println!("[binance-spot] connecting {}", endpoint);
                 let (mut stream, _resp) = match connect_async(&endpoint).await {
-                    Ok(ans) => { let _ = init_tx.send(Ok(())); println!("[binance-spot] connected {}", endpoint); ans }
+                    Ok(ans) => { let _ = init_tx.send(Ok(())); ans }
                     Err(e) => { eprintln!("[binance-spot] connect error {}: {}", endpoint, e); let _ = init_tx.send(Err(BorsaError::Other(format!("ws connect error: {}", e)))); return; }
                 };
                 loop {
                     tokio::select! {
-                        _ = stop_rx_clone.changed() => { let _ = stream.close(None).await; println!("[binance-spot] stop received {}", endpoint); break; }
+                        _ = stop_rx_clone.changed() => { let _ = stream.close(None).await; break; }
                         msg = stream.next() => {
                             match msg {
                                 Some(Ok(Message::Text(txt))) => {
-                                    println!("[binance-spot] msg len={}", txt.len());
                                     let mut v: serde_json::Value = match serde_json::from_str(&txt) { Ok(v) => v, Err(_) => continue };
                                     if let Some(data) = v.get("data").cloned() { v = data; }
                                     if let Ok(t) = serde_json::from_value::<binance::model::TradeEvent>(v) {
@@ -278,7 +268,7 @@ impl BinanceApi for RealAdapter {
                                     }
                                 }
                                 Some(Ok(Message::Ping(p))) => { let _ = stream.send(Message::Pong(p)).await; }
-                                Some(Ok(Message::Close(_))) => { println!("[binance-spot] close received {}", endpoint); break; }
+                                Some(Ok(Message::Close(_))) => { break; }
                                 Some(Ok(_)) => {}
                                 Some(Err(e)) => { eprintln!("[binance-spot] stream err: {}", e); break; }
                                 None => { eprintln!("[binance-spot] stream ended {}", endpoint); break; }
@@ -353,18 +343,16 @@ impl BinanceApi for RealAdapter {
             connect_futures.push(init_rx);
 
             task_handles.push(tokio::spawn(async move {
-                println!("[binance-spot] connecting {}", endpoint);
                 let (mut stream, _resp) = match connect_async(&endpoint).await {
-                    Ok(ans) => { let _ = init_tx.send(Ok(())); println!("[binance-spot] connected {}", endpoint); ans }
+                    Ok(ans) => { let _ = init_tx.send(Ok(())); ans }
                     Err(e) => { eprintln!("[binance-spot] connect error {}: {}", endpoint, e); let _ = init_tx.send(Err(BorsaError::Other(format!("ws connect error: {}", e)))); return; }
                 };
                 loop {
                     tokio::select! {
-                        _ = stop_rx_clone.changed() => { let _ = stream.close(None).await; println!("[binance-spot] stop received {}", endpoint); break; }
+                        _ = stop_rx_clone.changed() => { let _ = stream.close(None).await; break; }
                         msg = stream.next() => {
                             match msg {
                                 Some(Ok(Message::Text(txt))) => {
-                                    println!("[binance-spot] msg len={}", txt.len());
                                     let mut v: serde_json::Value = match serde_json::from_str(&txt) { Ok(v) => v, Err(_) => continue };
                                     if let Some(data) = v.get("data").cloned() { v = data; }
                                     if let Ok(t) = serde_json::from_value::<binance::model::KlineEvent>(v) {
@@ -374,7 +362,7 @@ impl BinanceApi for RealAdapter {
                                     }
                                 }
                                 Some(Ok(Message::Ping(p))) => { let _ = stream.send(Message::Pong(p)).await; }
-                                Some(Ok(Message::Close(_))) => { println!("[binance-spot] close received {}", endpoint); break; }
+                                Some(Ok(Message::Close(_))) => { break; }
                                 Some(Ok(_)) => {}
                                 Some(Err(e)) => { eprintln!("[binance-spot] stream err: {}", e); break; }
                                 None => { eprintln!("[binance-spot] stream ended {}", endpoint); break; }

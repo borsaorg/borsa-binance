@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use borsa_core::{AssetKind, BorsaError, Instrument, Interval, stream::StreamHandle};
-use tokio::sync::{mpsc, oneshot, watch};
+use tokio::sync::{mpsc, oneshot};
 
 // Re-export types from the fork for clarity
 use binance::{
@@ -12,10 +12,9 @@ use binance::{
     options::general::OptionsGeneral,
     options::model::{Options24hrTickerEvent, OptionsExchangeInfo},
 };
-// keep serde_json for WS parsing
-use futures_util::{SinkExt, StreamExt};
-use tokio_tungstenite::connect_async;
-use tokio_tungstenite::tungstenite::Message;
+use std::sync::atomic::{AtomicBool, Ordering};
+use binance::websockets::{WebSockets, WebsocketEvent};
+use binance::options::websockets::{OptionsWebSockets, OptionsWebsocketEvent};
 
 /// Maps the fork's error type to `BorsaError`.
 fn map_binance_error(e: binance::errors::Error) -> BorsaError {
@@ -108,7 +107,7 @@ impl BinanceApi for RealAdapter {
         &self,
         instruments: &[Instrument],
     ) -> Result<(StreamHandle, mpsc::Receiver<Options24hrTickerEvent>), BorsaError> {
-        // Build topic list
+        // Build topics
         let mut topics: Vec<String> = Vec::new();
         for inst in instruments {
             if inst.kind() != &AssetKind::Option {
@@ -127,7 +126,6 @@ impl BinanceApi for RealAdapter {
             topics.push(format!("{}@ticker", symbol));
         }
         if topics.is_empty() {
-            // Nothing to subscribe to
             let (_tx, rx) = mpsc::channel(1);
             let (stop_tx, _stop_rx) = oneshot::channel::<()>();
             let noop = tokio::spawn(async {});
@@ -136,83 +134,49 @@ impl BinanceApi for RealAdapter {
 
         let (tx, rx) = mpsc::channel(1024);
         let (stop_tx, mut stop_rx) = oneshot::channel::<()>();
-        let base = self.config.options_ws_endpoint.clone(); // e.g., wss://nbstream.binance.com/eoptions/ws
-        let url = base; // subscribe via RPC after connect
-
+        let config = self.config.clone();
         let topics_clone = topics.clone();
-        let join = tokio::spawn(async move {
-            let (mut stream, _resp) = match connect_async(&url).await {
-                Ok(ans) => ans,
-                Err(e) => {
-                    eprintln!("[binance-options] connect error {}: {}", url, e);
-                    return;
-                }
-            };
 
-            // Send SUBSCRIBE
-            let sub_req = serde_json::json!({
-                "method": "SUBSCRIBE",
-                "params": topics_clone,
-                "id": 1
-            });
-            if stream
-                .send(Message::Text(sub_req.to_string().into()))
-                .await
-                .is_err()
-            {
-                eprintln!("[binance-options] failed to send SUBSCRIBE");
-                let _ = stream.close(None).await;
+        let join = tokio::spawn(async move {
+            let running = AtomicBool::new(true);
+            let mut ws = OptionsWebSockets::new_with_config(
+                {
+                    let tx_clone = tx.clone();
+                    move |evt: OptionsWebsocketEvent| {
+                        if let OptionsWebsocketEvent::Ticker24hr(t) = evt {
+                            let _ = tx_clone.try_send(t);
+                        }
+                        Ok(())
+                    }
+                },
+                &config,
+            );
+
+            if let Err(e) = ws.connect_base().await {
+                eprintln!("[binance-options] connect error: {}", e);
                 return;
             }
-
-            // Ping task
-            let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(15));
+            if let Err(e) = ws.subscribe_tickers(&topics_clone).await {
+                eprintln!("[binance-options] subscribe error: {}", e);
+                let _ = ws.disconnect().await;
+                return;
+            }
 
             loop {
                 tokio::select! {
                     _ = &mut stop_rx => {
-                        // Unsubscribe then close
-                        let unsub_req = serde_json::json!({
-                            "method": "UNSUBSCRIBE",
-                            "params": topics,
-                            "id": 2
-                        });
-                        let _ = stream.send(Message::Text(unsub_req.to_string().into())).await;
-                        let _ = stream.close(None).await;
+                        running.store(false, Ordering::Relaxed);
+                        let _ = ws.unsubscribe_tickers(&topics_clone).await;
+                        let _ = ws.disconnect().await;
                         break;
                     }
-                    _ = ping_interval.tick() => {
-                        let _ = stream.send(Message::Ping(tokio_tungstenite::tungstenite::Bytes::new())).await;
-                    }
-                    msg = stream.next() => {
-                        match msg {
-                            Some(Ok(Message::Text(txt))) => {
-                                let mut v: serde_json::Value = match serde_json::from_str(&txt) {
-                                    Ok(v) => v,
-                                    Err(_) => continue,
-                                };
-                                if let Some(data) = v.get("data").cloned() {
-                                    v = data;
-                                }
-                                // Skip RPC acks like {"result":null,"id":1}
-                                if v.get("result").is_some() {
-                                    continue;
-                                }
-                                if let Ok(t) = serde_json::from_value::<binance::options::model::Options24hrTickerEvent>(v) {
-                                    if tx.send(t).await.is_err() {
-                                        eprintln!("[binance-options] tx closed");
-                                        break;
-                                    }
-                                } else {
-                                    // Optional: uncomment for debugging schema issues
-                                    // eprintln!("[binance-options] parse failed; raw={}", txt);
-                                }
-                            }
-                            Some(Ok(Message::Ping(p))) => { let _ = stream.send(Message::Pong(p)).await; }
-                            Some(Ok(Message::Close(_))) => { break; }
-                            Some(Ok(_)) => {}
-                            Some(Err(e)) => { eprintln!("[binance-options] stream err: {}", e); break; }
-                            None => { eprintln!("[binance-options] stream ended {}", url); break; }
+                    res = ws.event_loop(&running) => {
+                        if let Err(e) = res {
+                            eprintln!("[binance-options] event loop error: {}", e);
+                        }
+                        // Drop connection; outer loop will end unless stop signal sent; reconnect handled internally
+                        if !running.load(Ordering::Relaxed) {
+                            break;
                         }
                     }
                 }
@@ -226,13 +190,8 @@ impl BinanceApi for RealAdapter {
         &self,
         instruments: &[Instrument],
     ) -> Result<(StreamHandle, mpsc::Receiver<TradeEvent>), BorsaError> {
-        let (tx, rx) = mpsc::channel(1024);
-        let (stop_tx, stop_rx) = oneshot::channel::<()>();
-        let (stop_broadcast_tx, stop_broadcast_rx) = watch::channel(false);
-
-        let mut task_handles = Vec::new();
-        let mut connect_futures = Vec::new();
-
+        // Validate and build combined endpoints
+        let mut endpoints: Vec<String> = Vec::new();
         for inst in instruments {
             if inst.kind() != &AssetKind::Crypto {
                 return Err(BorsaError::InvalidArg(
@@ -240,81 +199,78 @@ impl BinanceApi for RealAdapter {
                 ));
             }
             let symbol = match inst.id() {
-                borsa_core::IdentifierScheme::Security(sec) => {
-                    sec.symbol.as_str().to_ascii_lowercase()
-                }
+                borsa_core::IdentifierScheme::Security(sec) => sec.symbol.as_str().to_ascii_lowercase(),
                 _ => {
                     return Err(BorsaError::InvalidArg(
                         "instrument is not a security".into(),
                     ));
                 }
             };
-            let endpoint = format!("{}/{}@trade", self.config.ws_endpoint.clone(), symbol);
-            let mut stop_rx_clone = stop_broadcast_rx.clone();
-            let tx_clone = tx.clone();
-            let (init_tx, init_rx) = oneshot::channel::<Result<(), BorsaError>>();
-            connect_futures.push(init_rx);
+            endpoints.push(format!("{}@trade", symbol));
+        }
+        if endpoints.is_empty() {
+            let (_tx, rx) = mpsc::channel(1);
+            let (stop_tx, _stop_rx) = oneshot::channel::<()>();
+            let noop = tokio::spawn(async {});
+            return Ok((StreamHandle::new(noop, stop_tx), rx));
+        }
 
-            task_handles.push(tokio::spawn(async move {
-                let (mut stream, _resp) = match connect_async(&endpoint).await {
-                    Ok(ans) => { let _ = init_tx.send(Ok(())); ans }
-                    Err(e) => { eprintln!("[binance-spot] connect error {}: {}", endpoint, e); let _ = init_tx.send(Err(BorsaError::Other(format!("ws connect error: {}", e)))); return; }
-                };
-                loop {
-                    tokio::select! {
-                        _ = stop_rx_clone.changed() => { let _ = stream.close(None).await; break; }
-                        msg = stream.next() => {
-                            match msg {
-                                Some(Ok(Message::Text(txt))) => {
-                                    let mut v: serde_json::Value = match serde_json::from_str(&txt) { Ok(v) => v, Err(_) => continue };
-                                    if let Some(data) = v.get("data").cloned() { v = data; }
-                                    if let Ok(t) = serde_json::from_value::<binance::model::TradeEvent>(v) {
-                                        if tx_clone.send(t).await.is_err() { eprintln!("[binance-spot] tx closed"); break; }
-                                    } else {
-                                        // Aid debugging by showing the payload that failed to parse
-                                        eprintln!("[binance-spot] parse failed; raw={}", txt);
-                                    }
-                                }
-                                Some(Ok(Message::Ping(p))) => { let _ = stream.send(Message::Pong(p)).await; }
-                                Some(Ok(Message::Close(_))) => { break; }
-                                Some(Ok(_)) => {}
-                                Some(Err(e)) => { eprintln!("[binance-spot] stream err: {}", e); break; }
-                                None => { eprintln!("[binance-spot] stream ended {}", endpoint); break; }
-                            }
+        let (tx, rx) = mpsc::channel(1024);
+        let (stop_tx, mut stop_rx) = oneshot::channel::<()>();
+        let config = self.config.clone();
+        let endpoints_clone = endpoints.clone();
+        let (init_tx, init_rx) = oneshot::channel::<Result<(), BorsaError>>();
+
+        let join = tokio::spawn(async move {
+            let running = AtomicBool::new(true);
+            let mut ws = WebSockets::new({
+                let tx_clone = tx.clone();
+                move |event: WebsocketEvent| {
+                    if let WebsocketEvent::Trade(t) = event {
+                        let _ = tx_clone.try_send(t);
+                    }
+                    Ok(())
+                }
+            });
+
+            match ws.connect_multiple_streams_with_config(&endpoints_clone, &config).await {
+                Ok(_) => { let _ = init_tx.send(Ok(())); }
+                Err(e) => {
+                    let _ = init_tx.send(Err(BorsaError::Other(format!("ws connect error: {}", e))));
+                    return;
+                }
+            }
+
+            loop {
+                tokio::select! {
+                    _ = &mut stop_rx => {
+                        running.store(false, Ordering::Relaxed);
+                        let _ = ws.disconnect().await;
+                        break;
+                    }
+                    res = ws.event_loop(&running) => {
+                        if let Err(e) = res {
+                            eprintln!("[binance-spot] event loop error: {}", e);
+                        }
+                        if !running.load(Ordering::Relaxed) {
+                            break;
                         }
                     }
                 }
-            }));
-        }
-
-        // Wait for all connection attempts
-        let results = futures_util::future::join_all(connect_futures).await;
-        let mut errors = Vec::new();
-        for res in results {
-            match res {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => errors.push(e),
-                Err(_) => errors.push(BorsaError::Other("Connect init task panicked".to_string())),
-            }
-        }
-        if !errors.is_empty() {
-            let _ = stop_broadcast_tx.send(true);
-            for h in task_handles {
-                let _ = h.await;
-            }
-            return Err(BorsaError::AllProvidersFailed(errors));
-        }
-
-        // Supervisor to fan-out the stop to all threads
-        let supervisor = tokio::spawn(async move {
-            let _ = stop_rx.await;
-            let _ = stop_broadcast_tx.send(true);
-            for h in task_handles {
-                let _ = h.await;
             }
         });
 
-        Ok((StreamHandle::new(supervisor, stop_tx), rx))
+        match init_rx.await {
+            Ok(Ok(())) => Ok((StreamHandle::new(join, stop_tx), rx)),
+            Ok(Err(e)) => {
+                let _ = join.abort();
+                Err(e)
+            }
+            Err(_) => {
+                let _ = join.abort();
+                Err(BorsaError::Other("Connect init task panicked".to_string()))
+            }
+        }
     }
 
     async fn stream_spot_kline(
@@ -322,12 +278,6 @@ impl BinanceApi for RealAdapter {
         instruments: &[Instrument],
         interval: Interval,
     ) -> Result<(StreamHandle, mpsc::Receiver<KlineEvent>), BorsaError> {
-        let (tx, rx) = mpsc::channel(1024);
-        let (stop_tx, stop_rx) = oneshot::channel::<()>();
-        let (stop_broadcast_tx, stop_broadcast_rx) = watch::channel(false);
-
-        let mut task_handles = Vec::new();
-        let mut connect_futures = Vec::new();
         let interval_suffix = match interval {
             Interval::I1s => "1s",
             Interval::I1h => "1h",
@@ -339,93 +289,88 @@ impl BinanceApi for RealAdapter {
             }
         };
 
+        // Validate and build combined endpoints
+        let mut endpoints: Vec<String> = Vec::new();
         for inst in instruments {
             if inst.kind() != &AssetKind::Crypto {
-                return Err(BorsaError::InvalidArg(
-                    format!(
-                        "stream_spot_kline({}) only supports Crypto assets",
-                        interval_suffix
-                    ),
-                ));
+                return Err(BorsaError::InvalidArg(format!(
+                    "stream_spot_kline({}) only supports Crypto assets",
+                    interval_suffix
+                )));
             }
             let symbol = match inst.id() {
-                borsa_core::IdentifierScheme::Security(sec) => {
-                    sec.symbol.as_str().to_ascii_lowercase()
-                }
+                borsa_core::IdentifierScheme::Security(sec) => sec.symbol.as_str().to_ascii_lowercase(),
                 _ => {
                     return Err(BorsaError::InvalidArg(
                         "instrument is not a security".into(),
                     ));
                 }
             };
-            let endpoint = format!(
-                "{}/{}@kline_{}",
-                self.config.ws_endpoint.clone(),
-                symbol,
-                interval_suffix
-            );
-            let mut stop_rx_clone = stop_broadcast_rx.clone();
-            let tx_clone = tx.clone();
-            let (init_tx, init_rx) = oneshot::channel::<Result<(), BorsaError>>();
-            connect_futures.push(init_rx);
+            endpoints.push(format!("{}@kline_{}", symbol, interval_suffix));
+        }
+        if endpoints.is_empty() {
+            let (_tx, rx) = mpsc::channel(1);
+            let (stop_tx, _stop_rx) = oneshot::channel::<()>();
+            let noop = tokio::spawn(async {});
+            return Ok((StreamHandle::new(noop, stop_tx), rx));
+        }
 
-            task_handles.push(tokio::spawn(async move {
-                let (mut stream, _resp) = match connect_async(&endpoint).await {
-                    Ok(ans) => { let _ = init_tx.send(Ok(())); ans }
-                    Err(e) => { eprintln!("[binance-spot] connect error {}: {}", endpoint, e); let _ = init_tx.send(Err(BorsaError::Other(format!("ws connect error: {}", e)))); return; }
-                };
-                loop {
-                    tokio::select! {
-                        _ = stop_rx_clone.changed() => { let _ = stream.close(None).await; break; }
-                        msg = stream.next() => {
-                            match msg {
-                                Some(Ok(Message::Text(txt))) => {
-                                    let mut v: serde_json::Value = match serde_json::from_str(&txt) { Ok(v) => v, Err(_) => continue };
-                                    if let Some(data) = v.get("data").cloned() { v = data; }
-                                    if let Ok(t) = serde_json::from_value::<binance::model::KlineEvent>(v) {
-                                        if tx_clone.send(t).await.is_err() { eprintln!("[binance-spot] tx closed"); break; }
-                                    } else {
-                                        eprintln!("[binance-spot] parse failed; raw={}", txt);
-                                    }
-                                }
-                                Some(Ok(Message::Ping(p))) => { let _ = stream.send(Message::Pong(p)).await; }
-                                Some(Ok(Message::Close(_))) => { break; }
-                                Some(Ok(_)) => {}
-                                Some(Err(e)) => { eprintln!("[binance-spot] stream err: {}", e); break; }
-                                None => { eprintln!("[binance-spot] stream ended {}", endpoint); break; }
-                            }
+        let (tx, rx) = mpsc::channel(1024);
+        let (stop_tx, mut stop_rx) = oneshot::channel::<()>();
+        let config = self.config.clone();
+        let endpoints_clone = endpoints.clone();
+        let (init_tx, init_rx) = oneshot::channel::<Result<(), BorsaError>>();
+
+        let join = tokio::spawn(async move {
+            let running = AtomicBool::new(true);
+            let mut ws = WebSockets::new({
+                let tx_clone = tx.clone();
+                move |event: WebsocketEvent| {
+                    if let WebsocketEvent::Kline(k) = event {
+                        let _ = tx_clone.try_send(k);
+                    }
+                    Ok(())
+                }
+            });
+
+            match ws.connect_multiple_streams_with_config(&endpoints_clone, &config).await {
+                Ok(_) => { let _ = init_tx.send(Ok(())); }
+                Err(e) => {
+                    let _ = init_tx.send(Err(BorsaError::Other(format!("ws connect error: {}", e))));
+                    return;
+                }
+            }
+
+            loop {
+                tokio::select! {
+                    _ = &mut stop_rx => {
+                        running.store(false, Ordering::Relaxed);
+                        let _ = ws.disconnect().await;
+                        break;
+                    }
+                    res = ws.event_loop(&running) => {
+                        if let Err(e) = res {
+                            eprintln!("[binance-spot] event loop error: {}", e);
+                        }
+                        if !running.load(Ordering::Relaxed) {
+                            break;
                         }
                     }
                 }
-            }));
-        }
-
-        let results = futures_util::future::join_all(connect_futures).await;
-        let mut errors = Vec::new();
-        for res in results {
-            match res {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => errors.push(e),
-                Err(_) => errors.push(BorsaError::Other("Connect init task panicked".to_string())),
-            }
-        }
-        if !errors.is_empty() {
-            let _ = stop_broadcast_tx.send(true);
-            for h in task_handles {
-                let _ = h.await;
-            }
-            return Err(BorsaError::AllProvidersFailed(errors));
-        }
-
-        let supervisor = tokio::spawn(async move {
-            let _ = stop_rx.await;
-            let _ = stop_broadcast_tx.send(true);
-            for h in task_handles {
-                let _ = h.await;
             }
         });
 
-        Ok((StreamHandle::new(supervisor, stop_tx), rx))
+        match init_rx.await {
+            Ok(Ok(())) => Ok((StreamHandle::new(join, stop_tx), rx)),
+            Ok(Err(e)) => {
+                let _ = join.abort();
+                Err(e)
+            }
+            Err(_) => {
+                let _ = join.abort();
+                Err(BorsaError::Other("Connect init task panicked".to_string()))
+            }
+        }
     }
 
     async fn get_klines_1s(

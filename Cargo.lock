@@ -196,7 +196,7 @@ dependencies = [
 [[package]]
 name = "borsa-core"
 version = "0.3.0"
-source = "git+https://github.com/borsaorg/borsa?rev=4401d9b22ca439bba7760c0d7e20bc4e8b634182#4401d9b22ca439bba7760c0d7e20bc4e8b634182"
+source = "git+https://github.com/borsaorg/borsa?rev=d96eae63d774d1e6fd3b7266ea45959278621bd1#d96eae63d774d1e6fd3b7266ea45959278621bd1"
 dependencies = [
  "async-trait",
  "bitflags",
@@ -214,7 +214,7 @@ dependencies = [
 [[package]]
 name = "borsa-macros"
 version = "0.3.0"
-source = "git+https://github.com/borsaorg/borsa?rev=4401d9b22ca439bba7760c0d7e20bc4e8b634182#4401d9b22ca439bba7760c0d7e20bc4e8b634182"
+source = "git+https://github.com/borsaorg/borsa?rev=d96eae63d774d1e6fd3b7266ea45959278621bd1#d96eae63d774d1e6fd3b7266ea45959278621bd1"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -225,7 +225,7 @@ dependencies = [
 [[package]]
 name = "borsa-middleware"
 version = "0.3.0"
-source = "git+https://github.com/borsaorg/borsa?rev=4401d9b22ca439bba7760c0d7e20bc4e8b634182#4401d9b22ca439bba7760c0d7e20bc4e8b634182"
+source = "git+https://github.com/borsaorg/borsa?rev=d96eae63d774d1e6fd3b7266ea45959278621bd1#d96eae63d774d1e6fd3b7266ea45959278621bd1"
 dependencies = [
  "async-trait",
  "borsa-core",
@@ -239,7 +239,7 @@ dependencies = [
 [[package]]
 name = "borsa-types"
 version = "0.3.0"
-source = "git+https://github.com/borsaorg/borsa?rev=4401d9b22ca439bba7760c0d7e20bc4e8b634182#4401d9b22ca439bba7760c0d7e20bc4e8b634182"
+source = "git+https://github.com/borsaorg/borsa?rev=d96eae63d774d1e6fd3b7266ea45959278621bd1#d96eae63d774d1e6fd3b7266ea45959278621bd1"
 dependencies = [
  "paft",
  "serde",

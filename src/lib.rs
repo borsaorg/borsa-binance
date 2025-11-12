@@ -429,16 +429,18 @@ impl CandleStreamProvider for BinanceConnector {
         instruments: &[Instrument],
         interval: Interval,
     ) -> Result<(StreamHandle, mpsc::Receiver<borsa_core::CandleUpdate>), BorsaError> {
-        // Support only H1 for now (maps to @kline_1h)
-        if interval != Interval::I1h {
+        if !matches!(interval, Interval::I1h | Interval::I1s) {
             return Err(BorsaError::unsupported(format!(
                 "stream_candles: interval {:?}",
                 interval
             )));
         }
 
-        // Start adapter-level kline stream (H1)
-        let (kline_handle, mut kline_rx) = self.adapter.stream_spot_kline_1h(instruments).await?;
+        // Start adapter-level kline stream
+        let (kline_handle, mut kline_rx) = self
+            .adapter
+            .stream_spot_kline(instruments, interval)
+            .await?;
 
         // Build symbol -> instrument map
         let mut map: HashMap<String, Instrument> = HashMap::new();

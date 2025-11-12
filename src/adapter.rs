@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use borsa_core::{AssetKind, BorsaError, Instrument, stream::StreamHandle};
+use borsa_core::{AssetKind, BorsaError, Instrument, Interval, stream::StreamHandle};
 use tokio::sync::{mpsc, oneshot, watch};
 
 // Re-export types from the fork for clarity
@@ -54,10 +54,11 @@ pub trait BinanceApi: Send + Sync {
         instruments: &[Instrument],
     ) -> Result<(StreamHandle, mpsc::Receiver<TradeEvent>), BorsaError>;
 
-    /// Stream spot 1h kline events for the given instruments (combined receiver).
-    async fn stream_spot_kline_1h(
+    /// Stream spot kline events for the given instruments (combined receiver).
+    async fn stream_spot_kline(
         &self,
         instruments: &[Instrument],
+        interval: Interval,
     ) -> Result<(StreamHandle, mpsc::Receiver<KlineEvent>), BorsaError>;
 
     // raw JSON exchangeInfo removed; use typed API above
@@ -309,9 +310,10 @@ impl BinanceApi for RealAdapter {
         Ok((StreamHandle::new(supervisor, stop_tx), rx))
     }
 
-    async fn stream_spot_kline_1h(
+    async fn stream_spot_kline(
         &self,
         instruments: &[Instrument],
+        interval: Interval,
     ) -> Result<(StreamHandle, mpsc::Receiver<KlineEvent>), BorsaError> {
         let (tx, rx) = mpsc::channel(1024);
         let (stop_tx, stop_rx) = oneshot::channel::<()>();
@@ -319,11 +321,24 @@ impl BinanceApi for RealAdapter {
 
         let mut task_handles = Vec::new();
         let mut connect_futures = Vec::new();
+        let interval_suffix = match interval {
+            Interval::I1s => "1s",
+            Interval::I1h => "1h",
+            _ => {
+                return Err(BorsaError::InvalidArg(format!(
+                    "stream_spot_kline unsupported interval: {:?}",
+                    interval
+                )));
+            }
+        };
 
         for inst in instruments {
             if inst.kind() != &AssetKind::Crypto {
                 return Err(BorsaError::InvalidArg(
-                    "stream_spot_kline_1h only supports Crypto assets".to_string(),
+                    format!(
+                        "stream_spot_kline({}) only supports Crypto assets",
+                        interval_suffix
+                    ),
                 ));
             }
             let symbol = match inst.id() {
@@ -336,7 +351,12 @@ impl BinanceApi for RealAdapter {
                     ));
                 }
             };
-            let endpoint = format!("{}/{}@kline_1h", self.config.ws_endpoint.clone(), symbol);
+            let endpoint = format!(
+                "{}/{}@kline_{}",
+                self.config.ws_endpoint.clone(),
+                symbol,
+                interval_suffix
+            );
             let mut stop_rx_clone = stop_broadcast_rx.clone();
             let tx_clone = tx.clone();
             let (init_tx, init_rx) = oneshot::channel::<Result<(), BorsaError>>();

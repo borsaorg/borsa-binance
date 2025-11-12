@@ -1,13 +1,15 @@
-use binance::{model::PriceStats, options::model::Options24hrTickerEvent};
+use binance::{model::{KlineSummary, PriceStats}, options::model::Options24hrTickerEvent};
 use borsa_core::{
-    AssetKind, BorsaError, Currency, Instrument, IsoCurrency, Money, OptionUpdate, Quote,
+    AssetKind, BorsaError, Candle, Currency, Instrument, Interval, IsoCurrency, Money, OptionUpdate,
+    Quote,
 };
 use chrono::{TimeZone, Utc};
 use rust_decimal::Decimal;
+use std::str::FromStr;
 
 /// Infers the quote currency from a spot symbol (e.g., "BTCUSDT" -> "USDT").
 /// This is a simplified helper.
-fn infer_currency_from_spot_symbol(symbol: &str) -> Result<Currency, BorsaError> {
+pub(crate) fn infer_currency_from_spot_symbol(symbol: &str) -> Result<Currency, BorsaError> {
     // Map common quote tokens to ISO USD for now (building block; refine as needed).
     // If you require exact token tracking (USDT vs USDC), represent as non-ISO currency instead.
     if symbol.ends_with("USDT") || symbol.ends_with("USDC") {
@@ -86,6 +88,58 @@ pub fn binance_option_ticker_to_update(
         ask: None,
         last_price,
         implied_volatility,
+    })
+}
+
+/// Converts a Binance `KlineSummary` (from REST history) into a Borsa `Candle`.
+pub(crate) fn kline_summary_to_candle(
+    symbol: &str,
+    interval: Interval,
+    summary: &KlineSummary,
+) -> Result<Candle, BorsaError> {
+    if interval != Interval::I1s {
+        return Err(BorsaError::unsupported(format!(
+            "kline_summary_to_candle: interval {:?}",
+            interval
+        )));
+    }
+
+    let currency = infer_currency_from_spot_symbol(symbol)?;
+
+    let parse_money = |value: &str| -> Result<Money, BorsaError> {
+        let dec = Decimal::from_str(value)
+            .map_err(|_| BorsaError::Data(format!("invalid kline price: {}", value)))?;
+        Money::new(dec, currency.clone()).map_err(BorsaError::from)
+    };
+
+    let ts = chrono::Utc
+        .timestamp_millis_opt(summary.open_time)
+        .single()
+        .ok_or_else(|| BorsaError::Data("invalid open_time from Binance response".into()))?;
+
+    let open = parse_money(&summary.open)?;
+    let high = parse_money(&summary.high)?;
+    let low = parse_money(&summary.low)?;
+    let close = parse_money(&summary.close)?;
+
+    let volume = summary.volume.parse::<f64>().ok().map(|v| {
+        if v <= 0.0 {
+            0
+        } else if v.is_finite() {
+            v as u64
+        } else {
+            0
+        }
+    });
+
+    Ok(Candle {
+        ts,
+        open,
+        high,
+        low,
+        close,
+        close_unadj: None,
+        volume,
     })
 }
 

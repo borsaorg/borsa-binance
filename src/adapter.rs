@@ -8,7 +8,7 @@ use binance::{
     api::{API, Options as OptionsApi},
     config::Config,
     market::Market,
-    model::{KlineEvent, PriceStats, TradeEvent},
+    model::{KlineEvent, KlineSummaries, KlineSummary, PriceStats, TradeEvent},
     options::general::OptionsGeneral,
     options::model::{Options24hrTickerEvent, OptionsExchangeInfo},
 };
@@ -61,7 +61,14 @@ pub trait BinanceApi: Send + Sync {
         interval: Interval,
     ) -> Result<(StreamHandle, mpsc::Receiver<KlineEvent>), BorsaError>;
 
-    // raw JSON exchangeInfo removed; use typed API above
+    /// Fetch 1-second klines via the public Binance data API.
+    async fn get_klines_1s(
+        &self,
+        symbol: &str,
+        limit: Option<u16>,
+        start_time_ms: Option<u64>,
+        end_time_ms: Option<u64>,
+    ) -> Result<Vec<KlineSummary>, BorsaError>;
 }
 
 /// The "real" adapter that holds clients for the `binance-rs`.
@@ -421,5 +428,20 @@ impl BinanceApi for RealAdapter {
         Ok((StreamHandle::new(supervisor, stop_tx), rx))
     }
 
-    // raw JSON exchangeInfo removed
+    async fn get_klines_1s(
+        &self,
+        symbol: &str,
+        limit: Option<u16>,
+        start_time_ms: Option<u64>,
+        end_time_ms: Option<u64>,
+    ) -> Result<Vec<KlineSummary>, BorsaError> {
+        let summaries = self
+            .market
+            .get_klines_1s_data_api(symbol.to_string(), limit, start_time_ms, end_time_ms)
+            .await
+            .map_err(map_binance_error)?;
+        match summaries {
+            KlineSummaries::AllKlineSummaries(v) => Ok(v),
+        }
+    }
 }

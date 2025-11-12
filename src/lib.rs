@@ -3,16 +3,18 @@ use tokio::sync::{mpsc, oneshot};
 
 use async_trait::async_trait;
 use borsa_core::connector::{
-    BorsaConnector, CandleStreamProvider, ConnectorKey, OptionChainProvider, OptionStreamProvider,
-    OptionsExpirationsProvider, QuoteProvider,
+    BorsaConnector, CandleStreamProvider, ConnectorKey, HistoryProvider, OptionChainProvider,
+    OptionStreamProvider, OptionsExpirationsProvider, QuoteProvider,
 };
 use borsa_core::{
-    AssetKind, BorsaError, Candle, Currency, Instrument, Interval, IsoCurrency, Money, OptionChain,
-    OptionContract, OptionUpdate, Quote, QuoteUpdate, stream::StreamHandle,
+    AssetKind, BorsaError, Candle, Currency, HistoryRequest, HistoryResponse, Instrument, Interval,
+    IsoCurrency, Money, OptionChain, OptionContract, OptionUpdate, Quote, QuoteUpdate, Range,
+    stream::StreamHandle,
 };
-use chrono::TimeZone;
+use chrono::{Duration, TimeZone};
 use rust_decimal::Decimal;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
+use std::convert::TryFrom;
 use std::str::FromStr;
 
 pub mod adapter;
@@ -66,6 +68,10 @@ impl BorsaConnector for BinanceConnector {
     fn supports_kind(&self, kind: AssetKind) -> bool {
         // Supports Spot (Crypto) and Options
         matches!(kind, AssetKind::Crypto | AssetKind::Option)
+    }
+
+    fn as_history_provider(&self) -> Option<&dyn HistoryProvider> {
+        Some(self as &dyn HistoryProvider)
     }
 
     fn as_quote_provider(&self) -> Option<&dyn QuoteProvider> {
@@ -125,6 +131,141 @@ impl QuoteProvider for BinanceConnector {
         let stats = self.adapter.get_quote(symbol_str).await?;
 
         convert::binance_price_stats_to_quote(stats, instrument.clone())
+    }
+}
+
+#[async_trait]
+impl HistoryProvider for BinanceConnector {
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(
+            name = "borsa_binance::history",
+            skip(self, instrument, req),
+            fields(id = ?instrument.id(), interval = ?req.interval())
+        )
+    )]
+    async fn history(
+        &self,
+        instrument: &Instrument,
+        req: HistoryRequest,
+    ) -> Result<HistoryResponse, BorsaError> {
+        if instrument.kind() != &AssetKind::Crypto {
+            return Err(BorsaError::unsupported(format!(
+                "history for {} (non-crypto assets)",
+                self.name()
+            )));
+        }
+
+        let symbol = match instrument.id() {
+            borsa_core::IdentifierScheme::Security(sec) => sec.symbol.as_str().to_string(),
+            _ => {
+                return Err(BorsaError::InvalidArg(
+                    "instrument is not a security".into(),
+                ));
+            }
+        };
+
+        if req.interval() != Interval::I1s {
+            return Err(BorsaError::unsupported(format!(
+                "history interval {:?} (supports I1s only)",
+                req.interval()
+            )));
+        }
+
+        let to_ms = |dt: chrono::DateTime<chrono::Utc>| -> Result<u64, BorsaError> {
+            let ms = dt.timestamp_millis();
+            if ms < 0 {
+                Err(BorsaError::InvalidArg(
+                    "history period before unix epoch".into(),
+                ))
+            } else {
+                Ok(ms as u64)
+            }
+        };
+
+        let (start_dt, end_dt) = if let Some((start, end)) = req.period() {
+            (start, end)
+        } else if matches!(req.range(), Some(Range::D1)) {
+            let end = chrono::Utc::now();
+            let start = end - Duration::days(1);
+            (start, end)
+        } else {
+            return Err(BorsaError::unsupported(
+                "history requires explicit period or Range::D1 for Binance 1s backfill",
+            ));
+        };
+
+        let start_ms = to_ms(start_dt)?;
+        let end_ms = to_ms(end_dt)?;
+        if start_ms >= end_ms {
+            return Err(BorsaError::InvalidArg(
+                "history period start must be before end".into(),
+            ));
+        }
+
+        const BATCH_LIMIT: u16 = 3000;
+        const MAX_BATCHES: usize = 200;
+
+        let mut fetch_start = start_ms;
+        let mut raw_summaries: Vec<binance::model::KlineSummary> = Vec::new();
+        let target_count = ((end_ms - start_ms) / 1000).saturating_add(1) as usize;
+
+        for _ in 0..MAX_BATCHES {
+            let batch = self
+                .adapter
+                .get_klines_1s(&symbol, Some(BATCH_LIMIT), Some(fetch_start), Some(end_ms))
+                .await?;
+
+            if batch.is_empty() {
+                break;
+            }
+
+            let last_open_ms = batch
+                .last()
+                .and_then(|k| u64::try_from(k.open_time).ok())
+                .unwrap_or(fetch_start);
+
+            for summary in batch.into_iter() {
+                if let Ok(open_ms) = u64::try_from(summary.open_time) {
+                    if open_ms >= start_ms && open_ms < end_ms {
+                        raw_summaries.push(summary);
+                    }
+                }
+            }
+
+            if raw_summaries.len() >= target_count {
+                break;
+            }
+
+            let next_start = last_open_ms.saturating_add(1_000);
+            if next_start >= end_ms || next_start <= fetch_start {
+                break;
+            }
+            fetch_start = next_start;
+        }
+
+        let mut candle_map: BTreeMap<i64, Candle> = BTreeMap::new();
+        for summary in &raw_summaries {
+            let candle = convert::kline_summary_to_candle(&symbol, Interval::I1s, summary)?;
+            candle_map.insert(summary.open_time, candle);
+        }
+        let candles: Vec<Candle> = candle_map.into_values().collect();
+
+        Ok(HistoryResponse {
+            candles,
+            actions: Vec::new(),
+            adjusted: false,
+            meta: None,
+        })
+    }
+
+    fn supported_history_intervals(&self, kind: AssetKind) -> &'static [Interval] {
+        if matches!(kind, AssetKind::Crypto) {
+            const SUPPORTED: &[Interval] = &[Interval::I1s];
+            SUPPORTED
+        } else {
+            &[]
+        }
     }
 }
 

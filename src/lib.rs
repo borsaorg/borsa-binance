@@ -203,8 +203,11 @@ impl HistoryProvider for BinanceConnector {
             ));
         }
 
-        const BATCH_LIMIT: u16 = 3000;
-        const MAX_BATCHES: usize = 200;
+        // Max allowed by Binance API
+        const BATCH_LIMIT: u16 = 1000;
+        
+        // Arbitrary limit as a safety net
+        const MAX_BATCHES: usize = 1000;
 
         let mut fetch_start = start_ms;
         let mut raw_summaries: Vec<binance::model::KlineSummary> = Vec::new();

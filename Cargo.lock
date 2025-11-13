@@ -196,7 +196,7 @@ dependencies = [
 [[package]]
 name = "borsa-core"
 version = "0.3.0"
-source = "git+https://github.com/borsaorg/borsa?rev=d96eae63d774d1e6fd3b7266ea45959278621bd1#d96eae63d774d1e6fd3b7266ea45959278621bd1"
+source = "git+https://github.com/borsaorg/borsa?rev=b2aac20299658bcc2c579a424c63870e28cb1318#b2aac20299658bcc2c579a424c63870e28cb1318"
 dependencies = [
  "async-trait",
  "bitflags",
@@ -214,7 +214,7 @@ dependencies = [
 [[package]]
 name = "borsa-macros"
 version = "0.3.0"
-source = "git+https://github.com/borsaorg/borsa?rev=d96eae63d774d1e6fd3b7266ea45959278621bd1#d96eae63d774d1e6fd3b7266ea45959278621bd1"
+source = "git+https://github.com/borsaorg/borsa?rev=b2aac20299658bcc2c579a424c63870e28cb1318#b2aac20299658bcc2c579a424c63870e28cb1318"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -225,7 +225,7 @@ dependencies = [
 [[package]]
 name = "borsa-middleware"
 version = "0.3.0"
-source = "git+https://github.com/borsaorg/borsa?rev=d96eae63d774d1e6fd3b7266ea45959278621bd1#d96eae63d774d1e6fd3b7266ea45959278621bd1"
+source = "git+https://github.com/borsaorg/borsa?rev=b2aac20299658bcc2c579a424c63870e28cb1318#b2aac20299658bcc2c579a424c63870e28cb1318"
 dependencies = [
  "async-trait",
  "borsa-core",
@@ -239,7 +239,7 @@ dependencies = [
 [[package]]
 name = "borsa-types"
 version = "0.3.0"
-source = "git+https://github.com/borsaorg/borsa?rev=d96eae63d774d1e6fd3b7266ea45959278621bd1#d96eae63d774d1e6fd3b7266ea45959278621bd1"
+source = "git+https://github.com/borsaorg/borsa?rev=b2aac20299658bcc2c579a424c63870e28cb1318#b2aac20299658bcc2c579a424c63870e28cb1318"
 dependencies = [
  "paft",
  "serde",
@@ -1052,7 +1052,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 [[package]]
 name = "paft"
 version = "0.8.0"
-source = "git+https://github.com/paft-rs/paft?rev=a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f#a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f"
+source = "git+https://github.com/paft-rs/paft?rev=7a64e12cd2c2a5a60671b15604f8c12981b3a6bc#7a64e12cd2c2a5a60671b15604f8c12981b3a6bc"
 dependencies = [
  "iso_currency",
  "paft-aggregates",
@@ -1069,7 +1069,7 @@ dependencies = [
 [[package]]
 name = "paft-aggregates"
 version = "0.8.0"
-source = "git+https://github.com/paft-rs/paft?rev=a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f#a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f"
+source = "git+https://github.com/paft-rs/paft?rev=7a64e12cd2c2a5a60671b15604f8c12981b3a6bc#7a64e12cd2c2a5a60671b15604f8c12981b3a6bc"
 dependencies = [
  "chrono",
  "paft-domain",
@@ -1082,7 +1082,7 @@ dependencies = [
 [[package]]
 name = "paft-core"
 version = "0.8.0"
-source = "git+https://github.com/paft-rs/paft?rev=a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f#a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f"
+source = "git+https://github.com/paft-rs/paft?rev=7a64e12cd2c2a5a60671b15604f8c12981b3a6bc#7a64e12cd2c2a5a60671b15604f8c12981b3a6bc"
 dependencies = [
  "chrono",
  "serde",
@@ -1092,7 +1092,7 @@ dependencies = [
 [[package]]
 name = "paft-domain"
 version = "0.8.0"
-source = "git+https://github.com/paft-rs/paft?rev=a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f#a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f"
+source = "git+https://github.com/paft-rs/paft?rev=7a64e12cd2c2a5a60671b15604f8c12981b3a6bc#7a64e12cd2c2a5a60671b15604f8c12981b3a6bc"
 dependencies = [
  "chrono",
  "isin",
@@ -1106,7 +1106,7 @@ dependencies = [
 [[package]]
 name = "paft-fundamentals"
 version = "0.8.0"
-source = "git+https://github.com/paft-rs/paft?rev=a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f#a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f"
+source = "git+https://github.com/paft-rs/paft?rev=7a64e12cd2c2a5a60671b15604f8c12981b3a6bc#7a64e12cd2c2a5a60671b15604f8c12981b3a6bc"
 dependencies = [
  "chrono",
  "iso_currency",
@@ -1121,7 +1121,7 @@ dependencies = [
 [[package]]
 name = "paft-market"
 version = "0.8.0"
-source = "git+https://github.com/paft-rs/paft?rev=a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f#a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f"
+source = "git+https://github.com/paft-rs/paft?rev=7a64e12cd2c2a5a60671b15604f8c12981b3a6bc#7a64e12cd2c2a5a60671b15604f8c12981b3a6bc"
 dependencies = [
  "bitflags",
  "chrono",
@@ -1138,7 +1138,7 @@ dependencies = [
 [[package]]
 name = "paft-money"
 version = "0.8.0"
-source = "git+https://github.com/paft-rs/paft?rev=a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f#a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f"
+source = "git+https://github.com/paft-rs/paft?rev=7a64e12cd2c2a5a60671b15604f8c12981b3a6bc#7a64e12cd2c2a5a60671b15604f8c12981b3a6bc"
 dependencies = [
  "iso_currency",
  "paft-utils",
@@ -1150,7 +1150,7 @@ dependencies = [
 [[package]]
 name = "paft-prediction"
 version = "0.8.0"
-source = "git+https://github.com/paft-rs/paft?rev=a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f#a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f"
+source = "git+https://github.com/paft-rs/paft?rev=7a64e12cd2c2a5a60671b15604f8c12981b3a6bc#7a64e12cd2c2a5a60671b15604f8c12981b3a6bc"
 dependencies = [
  "chrono",
  "paft-core",
@@ -1163,7 +1163,7 @@ dependencies = [
 [[package]]
 name = "paft-utils"
 version = "0.8.0"
-source = "git+https://github.com/paft-rs/paft?rev=a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f#a471ba8f7cd57fab0a5279ad3b142ca38cb61a0f"
+source = "git+https://github.com/paft-rs/paft?rev=7a64e12cd2c2a5a60671b15604f8c12981b3a6bc#7a64e12cd2c2a5a60671b15604f8c12981b3a6bc"
 dependencies = [
  "thiserror",
 ]

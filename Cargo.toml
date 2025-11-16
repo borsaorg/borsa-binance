@@ -18,9 +18,9 @@ test-adapters = []
 tracing = []
 
 [dependencies]
-borsa-core = { git = "https://github.com/borsaorg/borsa", rev = "4ab3118b60bec6731a3b7513596fa5d26f89f06c" }
+borsa-core = { git = "https://github.com/borsaorg/borsa", rev = "982f7a8dc818a38d9cf24c6c169df56bc898a44a" }
 # borsa-core = { path = "/Users/john/Projects/Public/borsa-workspace/borsa-core" }
-borsa-middleware = { git = "https://github.com/borsaorg/borsa", rev = "4ab3118b60bec6731a3b7513596fa5d26f89f06c" }
+borsa-middleware = { git = "https://github.com/borsaorg/borsa", rev = "982f7a8dc818a38d9cf24c6c169df56bc898a44a" }
 # borsa-middleware = { path = "/Users/john/Projects/Public/borsa-workspace/borsa-middleware" }
 async-trait = "0.1.89"
 thiserror = "2.0.17"

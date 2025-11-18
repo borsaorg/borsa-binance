@@ -84,6 +84,34 @@ impl RealAdapter {
 
         Self { market, config }
     }
+
+    pub fn new_with_endpoints(api_key: String, secret_key: String, futures_rest_api_endpoint: Option<String>, futures_ws_endpoint: Option<String>, options_rest_api_endpoint: Option<String>, options_ws_endpoint: Option<String>, rest_api_endpoint: Option<String>, ws_endpoint: Option<String>) -> Self {
+        
+        let mut config = Config::default();
+
+        if let Some(futures_rest_api_endpoint) = futures_rest_api_endpoint {
+            config = config.set_futures_rest_api_endpoint(futures_rest_api_endpoint);
+        }
+        if let Some(futures_ws_endpoint) = futures_ws_endpoint {
+            config = config.set_futures_ws_endpoint(futures_ws_endpoint);
+        }
+        if let Some(options_rest_api_endpoint) = options_rest_api_endpoint {
+            config = config.set_options_rest_api_endpoint(options_rest_api_endpoint);
+        }
+        if let Some(options_ws_endpoint) = options_ws_endpoint {
+            config = config.set_options_ws_endpoint(options_ws_endpoint);
+        }
+        if let Some(rest_api_endpoint) = rest_api_endpoint {
+            config = config.set_rest_api_endpoint(rest_api_endpoint);
+        }
+        if let Some(ws_endpoint) = ws_endpoint {
+            config = config.set_ws_endpoint(ws_endpoint);
+        }
+                                
+        let market = Market::new_with_config(Some(api_key), Some(secret_key), &config);
+
+        Self { market, config }
+    }
 }
 
 #[async_trait]

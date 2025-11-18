@@ -94,6 +94,7 @@ impl RealAdapter {
         options_ws_endpoint: Option<String>,
         rest_api_endpoint: Option<String>,
         ws_endpoint: Option<String>,
+        spot_data_api_endpoint: Option<String>,
     ) -> Self {
         let mut config = Config::default();
 
@@ -115,7 +116,10 @@ impl RealAdapter {
         if let Some(ws_endpoint) = ws_endpoint {
             config = config.set_ws_endpoint(ws_endpoint);
         }
-
+        if let Some(spot_data_api_endpoint) = spot_data_api_endpoint {
+            config = config.set_spot_data_api_endpoint(spot_data_api_endpoint);
+        }
+        
         let market = Market::new_with_config(Some(api_key), Some(secret_key), &config);
 
         Self { market, config }

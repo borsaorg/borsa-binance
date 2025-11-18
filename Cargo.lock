@@ -130,7 +130,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 [[package]]
 name = "binance"
 version = "0.21.2"
-source = "git+https://github.com/butterfly-trading/binance-rs-fork?rev=5c12c045ee5018611326d163c08d14cc561d39e2#5c12c045ee5018611326d163c08d14cc561d39e2"
+source = "git+https://github.com/butterfly-trading/binance-rs-fork?rev=521a4b5eac4b72611c248b8a7c63d7d508a5fb67#521a4b5eac4b72611c248b8a7c63d7d508a5fb67"
 dependencies = [
  "clap",
  "futures-util",

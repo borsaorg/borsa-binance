@@ -132,7 +132,7 @@ impl BinanceApi for RealAdapter {
     }
 
     async fn options_exchange_info_typed(&self) -> Result<OptionsExchangeInfo, BorsaError> {
-        let rest: OptionsGeneral = Binance::new(None, None);
+        let rest: OptionsGeneral = Binance::new_with_config(None, None, &self.config);
         rest.client
             .get::<OptionsExchangeInfo>(API::Options(OptionsApi::ExchangeInfo), None)
             .await
@@ -434,7 +434,7 @@ impl BinanceApi for RealAdapter {
     ) -> Result<Vec<KlineSummary>, BorsaError> {
         let summaries = self
             .market
-            .get_klines_1s_data_api(symbol.to_string(), limit, start_time_ms, end_time_ms)
+            .get_klines_1s_data_api(symbol.to_string(), limit, start_time_ms, end_time_ms, Some(self.config.spot_data_api_endpoint.clone()))
             .await
             .map_err(map_binance_error)?;
         match summaries {

@@ -1,7 +1,10 @@
-use binance::{model::{KlineSummary, PriceStats}, options::model::Options24hrTickerEvent};
+use binance::{
+    model::{KlineSummary, PriceStats},
+    options::model::Options24hrTickerEvent,
+};
 use borsa_core::{
-    AssetKind, BorsaError, Candle, Currency, Instrument, Interval, IsoCurrency, Money, OptionUpdate,
-    Quote,
+    AssetKind, BorsaError, Candle, Currency, Instrument, Interval, IsoCurrency, Money,
+    OptionUpdate, Quote,
 };
 use chrono::{TimeZone, Utc};
 use rust_decimal::Decimal;

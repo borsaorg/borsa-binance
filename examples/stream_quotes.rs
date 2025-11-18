@@ -7,11 +7,11 @@
 //! Set `BINANCE_STREAM_LIMIT` to limit number of printed updates (default: 5).
 //! Use Ctrl-C to stop early.
 
-use std::env;
-use std::time::Duration;
 use borsa_binance::BinanceConnector;
 use borsa_core::connector::StreamProvider;
 use borsa_core::{AssetKind, Instrument};
+use std::env;
+use std::time::Duration;
 use tokio::time::timeout;
 
 fn parse_symbols() -> Vec<String> {
@@ -34,7 +34,10 @@ fn symbol_from_instrument(inst: &Instrument) -> Option<&str> {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_key = env::var("BINANCE_API_KEY").unwrap_or_default();
     let secret_key = env::var("BINANCE_API_SECRET").unwrap_or_default();
-    let limit: usize = env::var("BINANCE_STREAM_LIMIT").ok().and_then(|s| s.parse().ok()).unwrap_or(5);
+    let limit: usize = env::var("BINANCE_STREAM_LIMIT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(5);
     let symbols = parse_symbols();
 
     let instruments: Vec<Instrument> = symbols
@@ -71,5 +74,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Stopped stream.");
     Ok(())
 }
-
-

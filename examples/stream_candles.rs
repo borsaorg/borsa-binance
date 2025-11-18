@@ -7,11 +7,11 @@
 //! - BINANCE_INTERVAL: 1s or 1h (default: 1s)
 //! - BINANCE_STREAM_LIMIT: number of updates to print (default: 5)
 
-use std::env;
-use std::time::Duration;
 use borsa_binance::BinanceConnector;
 use borsa_core::connector::CandleStreamProvider;
 use borsa_core::{AssetKind, Instrument, Interval};
+use std::env;
+use std::time::Duration;
 use tokio::time::timeout;
 
 fn parse_symbols() -> Vec<String> {
@@ -24,7 +24,10 @@ fn parse_symbols() -> Vec<String> {
 }
 
 fn parse_interval() -> Interval {
-    match env::var("BINANCE_INTERVAL").unwrap_or_else(|_| "1s".to_string()).as_str() {
+    match env::var("BINANCE_INTERVAL")
+        .unwrap_or_else(|_| "1s".to_string())
+        .as_str()
+    {
         "1h" | "1H" => Interval::I1h,
         _ => Interval::I1s,
     }
@@ -41,7 +44,10 @@ fn symbol_from_instrument(inst: &Instrument) -> Option<&str> {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_key = env::var("BINANCE_API_KEY").unwrap_or_default();
     let secret_key = env::var("BINANCE_API_SECRET").unwrap_or_default();
-    let limit: usize = env::var("BINANCE_STREAM_LIMIT").ok().and_then(|s| s.parse().ok()).unwrap_or(5);
+    let limit: usize = env::var("BINANCE_STREAM_LIMIT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(5);
     let symbols = parse_symbols();
     let interval = parse_interval();
 
@@ -57,7 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         symbols.join(", "),
         interval
     );
-    
+
     let mut printed = 0usize;
     while printed < limit {
         match timeout(Duration::from_secs(30), rx.recv()).await {
@@ -84,5 +90,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Stopped stream.");
     Ok(())
 }
-
-

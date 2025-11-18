@@ -6,10 +6,10 @@
 //! ```
 //! Optionally set `BINANCE_EXPIRY` to a UNIX timestamp (seconds) to target a specific day.
 
-use std::env;
 use borsa_binance::BinanceConnector;
 use borsa_core::connector::OptionChainProvider;
 use borsa_core::{AssetKind, Instrument};
+use std::env;
 
 fn parse_expiry() -> Option<i64> {
     env::var("BINANCE_EXPIRY").ok().and_then(|s| s.parse().ok())
@@ -32,21 +32,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let underlying_inst = Instrument::from_symbol(&underlying, AssetKind::Crypto)?;
     let connector = BinanceConnector::new_with_keys(api_key, secret_key);
 
-    let chain = connector.option_chain(&underlying_inst, target_expiry).await?;
+    let chain = connector
+        .option_chain(&underlying_inst, target_expiry)
+        .await?;
     println!("Underlying: {}", underlying);
     println!("Calls: {} | Puts: {}", chain.calls.len(), chain.puts.len());
 
     println!("Sample calls (max 5):");
     for c in chain.calls.iter().take(5) {
         let sym = symbol_from_instrument(&c.instrument).unwrap_or("UNKNOWN");
-        println!("- {} strike={} expiry_date={}", sym, c.strike, c.expiration_date);
+        println!(
+            "- {} strike={} expiry_date={}",
+            sym, c.strike, c.expiration_date
+        );
     }
     println!("Sample puts (max 5):");
     for p in chain.puts.iter().take(5) {
         let sym = symbol_from_instrument(&p.instrument).unwrap_or("UNKNOWN");
-        println!("- {} strike={} expiry_date={}", sym, p.strike, p.expiration_date);
+        println!(
+            "- {} strike={} expiry_date={}",
+            sym, p.strike, p.expiration_date
+        );
     }
     Ok(())
 }
-
-

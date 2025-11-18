@@ -205,7 +205,7 @@ impl HistoryProvider for BinanceConnector {
 
         // Max allowed by Binance API
         const BATCH_LIMIT: u16 = 1000;
-        
+
         // Arbitrary limit as a safety net
         const MAX_BATCHES: usize = 1000;
 

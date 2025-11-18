@@ -13,11 +13,11 @@
 //! ```
 //! Set `BINANCE_STREAM_LIMIT` to limit the number of printed updates (default: 5).
 
-use std::env;
-use std::time::Duration;
 use borsa_binance::BinanceConnector;
 use borsa_core::connector::{OptionChainProvider, OptionStreamProvider};
 use borsa_core::{AssetKind, Instrument, OptionUpdate};
+use std::env;
+use std::time::Duration;
 use tokio::time::timeout;
 
 fn parse_option_symbols() -> Vec<String> {
@@ -40,7 +40,10 @@ fn symbol_from_update(u: &OptionUpdate) -> Option<&str> {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_key = env::var("BINANCE_API_KEY").unwrap_or_default();
     let secret_key = env::var("BINANCE_API_SECRET").unwrap_or_default();
-    let limit: usize = env::var("BINANCE_STREAM_LIMIT").ok().and_then(|s| s.parse().ok()).unwrap_or(5);
+    let limit: usize = env::var("BINANCE_STREAM_LIMIT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(5);
 
     let connector = BinanceConnector::new_with_keys(api_key, secret_key);
 
@@ -53,7 +56,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map(|s| Instrument::from_symbol(s, AssetKind::Option))
                 .collect::<Result<_, _>>()?
         } else {
-            let underlying = env::var("BINANCE_UNDERLYING").unwrap_or_else(|_| "BTCUSDT".to_string());
+            let underlying =
+                env::var("BINANCE_UNDERLYING").unwrap_or_else(|_| "BTCUSDT".to_string());
             let underlying_inst = Instrument::from_symbol(&underlying, AssetKind::Crypto)?;
             let chain = connector.option_chain(&underlying_inst, None).await?;
             let mut picks: Vec<Instrument> = Vec::new();
@@ -64,7 +68,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 picks.push(first_put.instrument.clone());
             }
             if picks.is_empty() {
-                eprintln!("No options found for underlying {}; set BINANCE_OPTION_SYMBOLS instead.", underlying);
+                eprintln!(
+                    "No options found for underlying {}; set BINANCE_OPTION_SYMBOLS instead.",
+                    underlying
+                );
             }
             picks
         }
@@ -72,7 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if option_instruments.is_empty() {
         return Ok(());
     }
-    
+
     let symbols_pretty = option_instruments
         .iter()
         .filter_map(|i| match i.id() {
@@ -84,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .join(", ");
     let (handle, mut rx) = connector.stream_options(&option_instruments).await?;
     println!("Streaming option tickers for: {}", symbols_pretty);
-    
+
     let mut printed = 0usize;
     while printed < limit {
         match timeout(Duration::from_secs(60), rx.recv()).await {
@@ -110,5 +117,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Stopped stream.");
     Ok(())
 }
-
-

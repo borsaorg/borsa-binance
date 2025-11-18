@@ -3,6 +3,8 @@ use borsa_core::{AssetKind, BorsaError, Instrument, Interval, stream::StreamHand
 use tokio::sync::{mpsc, oneshot};
 
 // Re-export types from the fork for clarity
+use binance::options::websockets::{OptionsWebSockets, OptionsWebsocketEvent};
+use binance::websockets::{WebSockets, WebsocketEvent};
 use binance::{
     api::Binance, // The trait for new()
     api::{API, Options as OptionsApi},
@@ -13,8 +15,6 @@ use binance::{
     options::model::{Options24hrTickerEvent, OptionsExchangeInfo},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use binance::websockets::{WebSockets, WebsocketEvent};
-use binance::options::websockets::{OptionsWebSockets, OptionsWebsocketEvent};
 
 /// Maps the fork's error type to `BorsaError`.
 fn map_binance_error(e: binance::errors::Error) -> BorsaError {
@@ -85,8 +85,16 @@ impl RealAdapter {
         Self { market, config }
     }
 
-    pub fn new_with_endpoints(api_key: String, secret_key: String, futures_rest_api_endpoint: Option<String>, futures_ws_endpoint: Option<String>, options_rest_api_endpoint: Option<String>, options_ws_endpoint: Option<String>, rest_api_endpoint: Option<String>, ws_endpoint: Option<String>) -> Self {
-        
+    pub fn new_with_endpoints(
+        api_key: String,
+        secret_key: String,
+        futures_rest_api_endpoint: Option<String>,
+        futures_ws_endpoint: Option<String>,
+        options_rest_api_endpoint: Option<String>,
+        options_ws_endpoint: Option<String>,
+        rest_api_endpoint: Option<String>,
+        ws_endpoint: Option<String>,
+    ) -> Self {
         let mut config = Config::default();
 
         if let Some(futures_rest_api_endpoint) = futures_rest_api_endpoint {
@@ -107,7 +115,7 @@ impl RealAdapter {
         if let Some(ws_endpoint) = ws_endpoint {
             config = config.set_ws_endpoint(ws_endpoint);
         }
-                                
+
         let market = Market::new_with_config(Some(api_key), Some(secret_key), &config);
 
         Self { market, config }
@@ -227,7 +235,9 @@ impl BinanceApi for RealAdapter {
                 ));
             }
             let symbol = match inst.id() {
-                borsa_core::IdentifierScheme::Security(sec) => sec.symbol.as_str().to_ascii_lowercase(),
+                borsa_core::IdentifierScheme::Security(sec) => {
+                    sec.symbol.as_str().to_ascii_lowercase()
+                }
                 _ => {
                     return Err(BorsaError::InvalidArg(
                         "instrument is not a security".into(),
@@ -261,10 +271,16 @@ impl BinanceApi for RealAdapter {
                 }
             });
 
-            match ws.connect_multiple_streams_with_config(&endpoints_clone, &config).await {
-                Ok(_) => { let _ = init_tx.send(Ok(())); }
+            match ws
+                .connect_multiple_streams_with_config(&endpoints_clone, &config)
+                .await
+            {
+                Ok(_) => {
+                    let _ = init_tx.send(Ok(()));
+                }
                 Err(e) => {
-                    let _ = init_tx.send(Err(BorsaError::Other(format!("ws connect error: {}", e))));
+                    let _ =
+                        init_tx.send(Err(BorsaError::Other(format!("ws connect error: {}", e))));
                     return;
                 }
             }
@@ -327,7 +343,9 @@ impl BinanceApi for RealAdapter {
                 )));
             }
             let symbol = match inst.id() {
-                borsa_core::IdentifierScheme::Security(sec) => sec.symbol.as_str().to_ascii_lowercase(),
+                borsa_core::IdentifierScheme::Security(sec) => {
+                    sec.symbol.as_str().to_ascii_lowercase()
+                }
                 _ => {
                     return Err(BorsaError::InvalidArg(
                         "instrument is not a security".into(),
@@ -361,10 +379,16 @@ impl BinanceApi for RealAdapter {
                 }
             });
 
-            match ws.connect_multiple_streams_with_config(&endpoints_clone, &config).await {
-                Ok(_) => { let _ = init_tx.send(Ok(())); }
+            match ws
+                .connect_multiple_streams_with_config(&endpoints_clone, &config)
+                .await
+            {
+                Ok(_) => {
+                    let _ = init_tx.send(Ok(()));
+                }
                 Err(e) => {
-                    let _ = init_tx.send(Err(BorsaError::Other(format!("ws connect error: {}", e))));
+                    let _ =
+                        init_tx.send(Err(BorsaError::Other(format!("ws connect error: {}", e))));
                     return;
                 }
             }

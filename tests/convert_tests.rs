@@ -4,7 +4,7 @@ use borsa_core::{AssetKind, Instrument};
 use std::collections::BTreeMap;
 
 #[test]
-fn price_stats_to_quote_maps_usd_and_volume() {
+fn price_stats_to_quote_maps_usdt_and_volume() {
     // Arrange
     let inst = Instrument::from_symbol("BTCUSDT", AssetKind::Crypto).unwrap();
     let stats = PriceStats {
@@ -30,9 +30,9 @@ fn price_stats_to_quote_maps_usd_and_volume() {
     // Act
     let q = binance_price_stats_to_quote(stats, inst).unwrap();
 
-    // Assert
+    // Assert: USDT pairs use Currency::USDT (6 decimal places)
     let price = q.price.unwrap();
-    assert_eq!(price.currency().code(), "USD");
+    assert_eq!(price.currency().code(), "USDT");
     assert!(price.amount() > rust_decimal::Decimal::ZERO);
     assert_eq!(q.day_volume, Some(12345)); // f64 -> u64 lossy conversion
 }

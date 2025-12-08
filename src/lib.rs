@@ -527,10 +527,11 @@ impl borsa_core::connector::StreamProvider for BinanceConnector {
                     Some(trade) = trades_rx.recv() => {
                         let sym = trade.symbol.to_ascii_uppercase();
                         if let Some(inst) = map.get(&sym).cloned() {
-                            // Parse price as Decimal -> Money in USD (baseline)
+                            let cur = convert::infer_currency_from_spot_symbol(&sym)
+                                .unwrap_or(Currency::USDT);
                             let price_money = Decimal::from_str(&trade.price)
                                 .ok()
-                                .and_then(|d| Money::new(d, Currency::Iso(IsoCurrency::USD)).ok());
+                                .and_then(|d| Money::new(d, cur).ok());
                             let ts = chrono::Utc
                                 .timestamp_millis_opt(trade.trade_order_time as i64)
                                 .single()
@@ -609,12 +610,8 @@ impl CandleStreamProvider for BinanceConnector {
                         let sym = ke.symbol.to_ascii_uppercase();
                         if let Some(inst) = map.get(&sym).cloned() {
                             let k = ke.kline;
-                            // Currency baseline: USDT/USDC → USD
-                            let cur = if sym.ends_with("USDT") || sym.ends_with("USDC") {
-                                Currency::Iso(IsoCurrency::USD)
-                            } else {
-                                Currency::Iso(IsoCurrency::USD)
-                            };
+                            let cur = convert::infer_currency_from_spot_symbol(&sym)
+                                .unwrap_or(Currency::USDT);
                             // Parse price strings into Money
                             let open = Decimal::from_str(&k.open).ok().and_then(|d| Money::new(d, cur.clone()).ok());
                             let high = Decimal::from_str(&k.high).ok().and_then(|d| Money::new(d, cur.clone()).ok());

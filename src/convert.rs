@@ -11,12 +11,11 @@ use rust_decimal::Decimal;
 use std::str::FromStr;
 
 /// Infers the quote currency from a spot symbol (e.g., "BTCUSDT" -> "USDT").
-/// This is a simplified helper.
 pub(crate) fn infer_currency_from_spot_symbol(symbol: &str) -> Result<Currency, BorsaError> {
-    // Map common quote tokens to ISO USD for now (building block; refine as needed).
-    // If you require exact token tracking (USDT vs USDC), represent as non-ISO currency instead.
-    if symbol.ends_with("USDT") || symbol.ends_with("USDC") {
-        Ok(Currency::Iso(IsoCurrency::USD))
+    if symbol.ends_with("USDT") {
+        Ok(Currency::USDT)
+    } else if symbol.ends_with("USDC") {
+        Ok(Currency::USDC)
     } else {
         Err(BorsaError::Data(format!(
             "Could not infer quote currency from symbol {}",
